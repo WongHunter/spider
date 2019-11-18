@@ -41,3 +41,14 @@ spider
 	data
 	
 		城市名.xlsx
+架构：python3.7 mongodb redis
+
+使用了scrapy框架
+
+先执行lJ_region爬虫，把城市信息，URL信息保存到mongdb
+
+执行add_region_to_redis.py脚本，把url保存在redis,
+
+先执行lJ_zufang爬虫，从redis读取俩爬取租房信息并保存到mongdb
+
+最后执行add_zufang_to_excel.py脚本，形成excel形式的数据报表
