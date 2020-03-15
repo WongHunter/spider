@@ -1,0 +1,123 @@
+# 登陆
+# 登陆网址
+# http://user.qunar.com/passport/login.jsp
+# 用户名 dpxebje1666
+# 密码 
+# 查询
+# 下单
+# https://flight.qunar.com/site/oneway_list.htm?searchDepartureAirport=北京&searchArrivalAirport=上海&searchDepartureTime=2020-03-16
+import asyncio
+import random
+from pyppeteer.launcher import *
+
+AUTOMATION_ARGS.remove('--enable-automation')
+js2 = '''() => {
+        alert (
+            window.navigator.webdriver
+        )
+    }'''
+
+async def page_evaluate(page):
+    # 替换淘宝在检测浏览时采集的一些参数
+    # 需要注意，在测试的过程中发现登陆成功后页面的该属性又会变成True
+    # 所以在每次重新加载页面后要重新设置该属性的值。
+    await page.evaluate('''() =>{ Object.defineProperties(navigator,{ webdriver:{ get: () => false } }) }''')
+    await page.evaluate('''() =>{ window.navigator.chrome = { runtime: {},  }; }''')
+    await page.evaluate('''() =>{ Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] }); }''')
+    await page.evaluate('''() =>{ Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5,6], }); }''')
+
+async def try_validation(page, distance=308):
+    # 将距离拆分成两段，模拟正常人的行为
+    distance1 = distance - 10
+    distance2 = 10
+    btn_position = await page.evaluate('''
+       () =>{
+        return {
+         x: document.querySelector('#nc_1_n1z').getBoundingClientRect().x,
+         y: document.querySelector('#nc_1_n1z').getBoundingClientRect().y,
+         width: document.querySelector('#nc_1_n1z').getBoundingClientRect().width,
+         height: document.querySelector('#nc_1_n1z').getBoundingClientRect().height
+         }}
+        ''')
+    x = btn_position['x'] + btn_position['width'] / 2
+    y = btn_position['y'] + btn_position['height'] / 2
+    # print(btn_position)
+    await page.mouse.move(x, y)
+    await page.mouse.down()
+    await page.mouse.move(x + distance1, y, {'steps': 30})
+    await page.waitFor(800)
+    await page.mouse.move(x + distance1 + distance2, y, {'steps': 20})
+    await page.waitFor(800)
+    await page.mouse.up()
+
+async def del_users(page):
+    await page.waitFor(1000)
+    await page.click('#passenger_list > tr.multiple-identities > th.ct6.edit')
+    await page.waitFor(1000)
+    await page.click('body > div.q_pagecontainer > div > div > div > div.l_m770.g-main-ctn > div.stage_main.pis > div > a')
+    await page.waitFor(1000)
+    await page.click('body > div:nth-child(10) > div > div > form > div.btns > a.button')
+    await page.close()
+
+async def add_users(page):
+    name="王平品"
+    ssid=''
+    phone=''
+    await page.waitFor(1000)
+    await page.type('#tr_1 > div > input',ssid)
+    await page.type('#main_information > form > div:nth-child(1) > table > tbody > tr:nth-child(1) > td > input[type="text"]',name)
+    await page.type('#main_information > form > div.user_table_basic_editable.user_table_basic_editable_other > table > tbody > tr:nth-child(2) > td > input[type="text"]',phone)
+    await page.waitFor(1000)
+    await page.type('#tr_1 > div.addition > input',ssid)
+    await page.click('#main_information > form > div.user_table_basic_editable.user_table_basic_editable_other > table > tbody > tr:nth-child(9) > td > input.save-btn')
+    await page.close()
+async def search():
+
+    browser = await launch(headless=False, userDataDir='./userdata', args=['--disable-infobars'])
+    page = await browser.newPage()
+    instr=['北京','上海','2020-03-16']
+    url='https://flight.qunar.com/site/oneway_list.htm?searchDepartureAirport={}&searchArrivalAirport={}&searchDepartureTime={}'.format(instr[0],instr[1],instr[2])
+    url='https://m.flight.qunar.com/h5/flight/'
+    await page.goto(url=url)
+    await page_evaluate(page)
+    await page.waitFor(1000)
+    await page.click('.submit .searchBtn')
+    await page.waitFor(1000)
+    await page.evaluate('window.scrollBy(0, document.body.scrollHeight)')
+    # await page.evaluate(js2)
+    await page.waitFor(1000)
+    await page.click('#flightList > div > div.flight-list.flight-show-one > ul > li:nth-child(1)')
+    await page.waitFor(1000)
+
+    await page.click('#app > div > div > div > div > div.ota_list.doshow-85.active > div > ul > li:nth-child(2) > div')
+    await page.waitFor(1000)
+    #添加旅客信息
+    page_add = await browser.newPage()
+    url='https://user.qunar.com/contact/savePage'
+    await page_add.goto(url=url)
+    await page_evaluate(page_add)
+    await add_users(page=page_add)
+
+    await page.click('.fd-endorse-book.yudin')
+    await page.waitFor(1000)
+    # await page.click('#ComponentsContainer > section.m-contact > ul > li:nth-child(1) > div.value > button')
+    # await page.waitFor(1000)
+    # await page.click('#app > div > section > div > section > ul > li > div > div')
+    # await page.waitFor(1000)
+    await page.click('#app > div > section > section.m-submit > div')
+    await page.waitFor(1000)
+    await asyncio.sleep(5)
+    await page.click('#app > section > section.m_page_wp > div.m_pay_btn')
+    await page.waitFor(1000)
+    await asyncio.sleep(5)
+    # 删除旅客信息
+    page_del = await browser.newPage()
+    url = 'https://user.qunar.com/contact/listPage'
+    await page_del.goto(url=url)
+    await page_evaluate(page_del)
+    await del_users(page=page_del)
+
+    # await try_validation(page)
+    await asyncio.sleep(100)
+asyncio.get_event_loop().run_until_complete(search())
+
